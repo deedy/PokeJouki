@@ -13,7 +13,7 @@ let hash_to_list ht = Table.fold(fun k v acc -> v::acc) ht []
 let type_of_string str =
   match str with
   | "Fire" -> Fire
-  | "Water" ->Water
+  | "Water" -> Water
   | "Ice" -> Ice
   | "Grass" -> Grass
   | "Poison" -> Poison

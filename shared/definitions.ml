@@ -64,7 +64,7 @@ type attack = {
   element: steamtype;
   max_pp: int;
   pp_remaining: int;
-  power : int;
+  power: int;
   accuracy: int;
   crit_chance: int;
   effect: attack_effect
@@ -72,8 +72,8 @@ type attack = {
 
 type steammon = {
   species: string;
-  curr_hp : int;
-  max_hp : int;
+  curr_hp: int;
+  max_hp: int;
   first_type: steamtype option;
   second_type: steamtype option;
   first_attack: attack;
@@ -81,9 +81,9 @@ type steammon = {
   third_attack: attack;
   fourth_attack: attack;
   attack: int;
-	spl_attack : int;
+  spl_attack: int;
   defense: int;
-	spl_defense: int;
+  spl_defense: int;
   speed: int;
   status: status list;
   mods: modifier
@@ -100,13 +100,13 @@ type steam_pool = steammon list
 
 type game_result = Winner of color | Tie
 
-(*Battle Actions send by AI*)
+(* Battle Actions send by AI *)
 type action = SelectStarter of string
-  					| PickSteammon of string
-						| PickInventory of inventory
-  					| SwitchSteammon of string
-  					| UseItem of item * string
-  					| UseAttack of string
+            | PickSteammon of string
+            | PickInventory of inventory
+            | SwitchSteammon of string
+            | UseItem of item * string
+            | UseAttack of string
 
 (* Graphic Updates *)
 type update = InitGraphics 
@@ -119,7 +119,7 @@ type update = InitGraphics
             | Message of string
 
 
-(*Control Updates *)
+(* Control Updates *)
 type control = GameStart
              | GameRequest
              | Team of color
@@ -127,7 +127,7 @@ type control = GameStart
 
 type request = StarterRequest of game_status_data 
              | PickRequest of color * game_status_data * attack_set * steam_pool 
-						 | PickInventoryRequest of game_status_data 
+             | PickInventoryRequest of game_status_data 
              | ActionRequest of game_status_data
 
 type command = Control of control 
