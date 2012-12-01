@@ -4,6 +4,8 @@ open Constants
 open Util
 open Netgraphics
 
+let _ = Random.self_init ()
+
 (* Finds a steammon from a list of steammon *)
 let find_steammon (steammon_list : steammon list) (name : string) : steammon =
   let helper acc x = if x.species = name then Some x else acc in
@@ -37,7 +39,8 @@ let switch_steammons (steammons : msteammon list ref) (name : string) : unit =
       let helper acc x = if x.mspecies = name then acc else x::acc in
       List.fold_left helper [] !steammons in
     steammons := switch_in::steammons_after_removal;
-    add_update (SetChosenSteammon (switch_in.mspecies)) end
+    add_update (SetChosenSteammon (switch_in.mspecies));
+    add_update (SetStatusEffects (switch_in.mspecies,switch_in.mstatus)) end
 
 (* Adds an msteammon to the team from a list of steammon *)
 let add_steammon (steammons : msteammon list ref) 
@@ -196,7 +199,9 @@ let use_attack (steammons1 : msteammon list ref) (steammons2 : msteammon list re
   
   (* Proceeds to use the attack, checking for paralysis and self_attack,
        and checking if the attack has enough pp left *)
-  if paralysis then ()
+  if attacker.mcurr_hp = 0 then ()
+  else if paralysis then 
+    add_update (Message(attacker.mspecies^" is paralyzed! It cannot attack!"))
   else if self_attack then begin
       let damage = cSELF_ATTACK_POWER * attacker.mattack / attacker.mdefense in
       let new_hp = if attacker.mcurr_hp - damage < 0 then 0
@@ -207,9 +212,9 @@ let use_attack (steammons1 : msteammon list ref) (steammons2 : msteammon list re
     end 
   else if attack.mpp_remaining < 1 then
     add_update (Message(attacker.mspecies^" has no pp remaining for this attack"))
-  else if attacker.mcurr_hp = 0 then ()
   else if attack_hit then begin
-    
+    (* The attacker uses the attack *)
+
     (* Decrements the mpp_remaining for this attack *)
     attack.mpp_remaining <- attack.mpp_remaining - 1;
 
@@ -235,7 +240,7 @@ let use_attack (steammons1 : msteammon list ref) (steammons2 : msteammon list re
     (* Decides whether to use spl_attack/spl_defense or attack/defense stats*)
     let (att, def) = 
       match attack.melement with
-      | Electric | Fire | Water | Ghost | Psychic -> 
+      | Electric | Psychic | Dark | Dragon | Ice | Fire | Water | Grass -> 
         (float_of_int attacker.mspl_attack, float_of_int defender.mspl_defense)
       | _ -> (float_of_int attacker.mattack *. att_mod, 
               float_of_int defender.mdefense *. def_mod) in
@@ -246,7 +251,7 @@ let use_attack (steammons1 : msteammon list ref) (steammons2 : msteammon list re
 
     (* Assigns a STAB multiplier *)
     let stab = 
-      let same type1 type2 = match type2 with None -> false | Some t -> t = type1 in
+      let same type1 type2 = match type2 with None -> false | Some t -> t=type1 in
       if same attack.melement attacker.mfirst_type || 
          same attack.melement attacker.msecond_type then cSTAB_BONUS else 1. in
 

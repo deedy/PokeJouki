@@ -5,6 +5,8 @@ open Netgraphics
 open State
 open Action_handler
 
+let _ = Random.self_init ()
+
 (* You have to implement this. Change it from int to your own state type*)
 type game = mgame_status_data
 
@@ -15,10 +17,8 @@ let steammon_list = ref [] and attack_list = ref []
 
 (* Converts from type Game.game to Definitions.game_status_data *)
 let game_datafication (g : game) : game_status_data =
-
   (* Converts item_count from an int ref to an int and adds it to the acc list *)
   let inventory_datafication acc item_count = !item_count::acc in
-
   (* Returns an object of type Definitions.game_status_data *)
   let (msteammons1, minventory1), (msteammons2, minventory2) = g in
   let helper acc msteammon = (steammon_datafication msteammon)::acc in
@@ -32,10 +32,8 @@ let game_datafication (g : game) : game_status_data =
 
 (* Converts an object of type Definitions.game_status_data to Game.game *)
 let game_from_data (game_data : game_status_data) : game =
-  
   (* Converts item_count from type int to int ref and adds it to the acc list *)
   let inventory_mutafication acc item_count = (ref item_count)::acc in
-
   (* Returns an object of type Game.game *)
   let (steammons1, inventory1), (steammons2, inventory2) = game_data in
   let helper acc steammon = (steammon_mutafication steammon)::acc in
@@ -49,19 +47,16 @@ let game_from_data (game_data : game_status_data) : game =
 
 (* Handles a step in the game *)
 let handle_step (g : game) (ra : command) (ba : command) : game_output =
-
   (* Functions to see if m has the given status *)
   let asleep m = List.mem Asleep m.mstatus and
       frozen m = List.mem Frozen m.mstatus and
       confused m = List.mem Confused m.mstatus and
       poisoned m = List.mem Poisoned m.mstatus and
       paralyzed m = List.mem Paralyzed m.mstatus in
-
   (* Functions to remove the given status from m *)
   let wake_up m = m.mstatus <- List.filter (fun x -> x <> Asleep) m.mstatus and
       snap_out m = m.mstatus <- List.filter (fun x -> x <> Confused) m.mstatus and
       defrost m = m.mstatus <- List.filter (fun x -> x <> Frozen) m.mstatus in
-
   (* Functions to remove status with a certain probability or apply poison *)
   let check_sleeping m = if Random.int 100 < cWAKE_UP_CHANCE && asleep m then 
         (wake_up m; add_update (Message(m.mspecies^" has woken up!"))) and
@@ -78,12 +73,10 @@ let handle_step (g : game) (ra : command) (ba : command) : game_output =
                         else int_of_float (float_of_int m.mcurr_hp -. dmg) in
            m.mcurr_hp <- new_hp;
            add_update (Message(m.mspecies^" has been hurt by its poison!"))) in
-
   (* Defines the red and blue teams and steammon from the game *)
   let (red_team, blue_team) = g in
   let (r_steammons, _) = red_team and (b_steammons, _) = blue_team in
   let red_req = ref None and blue_req = ref None in
-
   (* Function to handle an action *)
   let handle_action action color =
     let req1 = match color with Blue -> blue_req | Red -> red_req and
@@ -124,7 +117,9 @@ let handle_step (g : game) (ra : command) (ba : command) : game_output =
         switch_steammons steammons1 name;
         set_request req1 (check_faint (List.hd !steammons1)) end
     | UseItem (item,name) -> begin
-        print_endline ("item is being used on "^name);
+        let find_by_name name = List.fold_left (fun acc x -> if x.mspecies = name then x else acc) (List.hd !steammons1) !steammons1 in
+        let y = find_by_name name in
+        print_endline ("item is being used on "^name^": hp = "^(string_of_int y.mcurr_hp));
         use_item steammons1 minventory1 name item color;
         set_request req1 (check_faint (List.hd !steammons1));
         print_endline ("item used on "^name) end
@@ -138,7 +133,6 @@ let handle_step (g : game) (ra : command) (ba : command) : game_output =
         check_frozen active;
         set_request req1 (check_faint active);
         print_endline (active.mspecies^" used "^attack) end in
-
   (* Matches the commands. If they are not of type Action, nothing happens *)
   begin match ra,ba with
     | Action r_action, Action b_action -> begin 
@@ -150,7 +144,6 @@ let handle_step (g : game) (ra : command) (ba : command) : game_output =
             print_endline "Both attack";
             let r_active = List.hd !r_steammons and 
                 b_active = List.hd !b_steammons in
-            
             (* Function to calculate speed mod *)
             let find_speed_mod speed_mod = match speed_mod with
                                            | -3 -> cSPEED_DOWN3
@@ -161,8 +154,7 @@ let handle_step (g : game) (ra : command) (ba : command) : game_output =
                                            | 3 -> cSPEED_UP3
                                            | _ -> 1. in
             let rspeed_mod = find_speed_mod (r_active.mmods).mspeed_mod and
-                bspeed_mod = find_speed_mod (b_active.mmods).mspeed_mod in
-            
+                bspeed_mod = find_speed_mod (b_active.mmods).mspeed_mod in     
             (* Function to find the speed of msteammon *)
             let find_speed msteammon speed_mod paralyzed =
               let speed = float_of_int msteammon.mspeed and
@@ -170,8 +162,7 @@ let handle_step (g : game) (ra : command) (ba : command) : game_output =
               if paralyzed then speed *. speed_mod /. slow
               else speed *. speed_mod in
             let r_speed = find_speed r_active rspeed_mod (paralyzed r_active) and
-                b_speed = find_speed b_active bspeed_mod (paralyzed b_active) in
-            
+                b_speed = find_speed b_active bspeed_mod (paralyzed b_active) in    
             (* Compares the speeds and applies poisons *)
             let set_first c = add_update (SetFirstAttacker c) in
             if r_speed > b_speed then (set_first Red; do_ra (); do_ba ())
@@ -186,12 +177,11 @@ let handle_step (g : game) (ra : command) (ba : command) : game_output =
         | _, UseAttack b_attack -> (print_endline "Blue attack"; do_ra (); do_ba ();
                                     apply_poison (List.hd !r_steammons);
                                     apply_poison (List.hd !b_steammons))
-        | _, _ -> if Random.int 2 = 0 then (do_ra (); do_ba ())
+        | _, _ -> if Random.int 100 < 50 then (do_ra (); do_ba ())
                   else (do_ba (); do_ra ()) end
     | Action r_action, _ -> handle_action r_action Red
     | _, Action b_action -> handle_action b_action Blue
     | _ -> () end;
-
   (* Checks to see if either team has lost *)
   let helper acc x = if x.mcurr_hp = 0 then acc else false in
   let red_fainted = List.length !r_steammons = cNUM_PICKS &&
@@ -203,20 +193,14 @@ let handle_step (g : game) (ra : command) (ba : command) : game_output =
                     | true,false -> Some (Winner Blue)
                     | false,true -> Some (Winner Red)
                     | _ -> None in
-
   (* Returns a game_output *)
-  if List.length !r_steammons = 5 && List.length !b_steammons = 5 then
-    (print_endline ((List.hd !r_steammons).mspecies^" "^
-                    (string_of_int (List.hd !r_steammons).mcurr_hp));
-     print_endline ((List.hd !b_steammons).mspecies^" "^
-                    (string_of_int (List.hd !b_steammons).mcurr_hp)));
   (game_result, game_datafication g, !red_req, !blue_req)
 
 
 (* Initializes a game *)
 let init_game (() : unit) : game * color * attack list * steammon list = 
-
-  (* Reads "attack.txt" and converts it into a list of attacks *)
+  (* Reads "attack.txt" and converts it into a list of attacks.
+       Also fills in attack_list. *)
   let attack_lines = read_lines "attack.txt" in
   let make_attack acc line = 
     let attrs = wordify line in
@@ -233,7 +217,6 @@ let init_game (() : unit) : game * color * attack list * steammon list =
     attack::acc in
   let attacks = List.fold_left make_attack [] (List.tl attack_lines) in
   attack_list := attacks;
-
   (* Reads "steammon.txt" and converts it into a list of steammon.
       Also fills in steammon_list. *)
   let steammon_lines = read_lines "steammon.txt" in
@@ -272,7 +255,6 @@ let init_game (() : unit) : game * color * attack list * steammon list =
     steammon::acc in
   let steammons = List.fold_left make_steammon [] steammon_lines in
   steammon_list := steammons;
-
   (* Returns a game, a color (representing the team that gets to pick first),
      a list of attacks, and a list of steammon *)
   let make_team () = (ref [], [ref cNUM_ETHER;
