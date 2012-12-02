@@ -58,8 +58,10 @@ let find_damage attack mon1 mon2 =
   and (att,def) = (find_att_stat attack mon1, find_def_stat attack mon2)
   and critchance = float_of_int attack.crit_chance in
   let crit = (critchance)/.100.*.(cCRIT_MULTIPLIER -. 1.)+.1. in
-  if ((power *. accur *. att *. stab *. mult *. crit /. def) /. hp) > 1. then 1.
-  else (power *. accur *. att *. stab *. mult *. crit /. def) /. hp
+  let dmg = 
+    if hp = 0. then 1. 
+    else ((power *. accur *. att *. stab *. mult *. crit /. def) /. hp) in
+  if dmg > 1. then 1. else dmg
 
 let find_damages_and_attacks mon1 mon2 = 
   let helper acc x = (find_damage x mon1 mon2, x.name)::acc in
@@ -75,8 +77,9 @@ let find_enemy_damage_taken mon enemies =
   let helper acc x = fst (List.hd (find_damages_and_attacks x mon)) +. acc in
   List.fold_left helper 0. enemies
 
-let find_net_damage_avg mon enemies = (find_enemy_damage mon enemies) -. 
-                                      (find_enemy_damage_taken mon enemies)
+let find_net_damage_avg mon enemies = if mon.species = "Magikarp" then (print_endline ((string_of_float (find_enemy_damage mon enemies))^" NNNNNNNNN "^(string_of_float (find_enemy_damage_taken mon enemies))));
+  (find_enemy_damage mon enemies) -. (find_enemy_damage_taken mon enemies) +.
+  (float_of_int (List.length enemies))
 
 let find_net_damage_avgs mons enemies =
   List.fold_left (fun acc x -> (find_net_damage_avg x enemies)::acc) [] mons
@@ -150,9 +153,9 @@ let find_total_proportion mon mons enemies weights hs =
   let spv_prop = if List.nth hs 4 = 0. then 0.
                  else (find_speed_vsenemies mon enemies) /. (List.nth hs 4) in
   let nda_prop = if List.nth hs 5 = 0. then 0.
-                 else (find_net_damage_avg mon enemies) /. (List.nth hs 5) in
+                 else (if mon.species = "Magikarp" then (print_endline ((string_of_float (find_net_damage_avg mon enemies))^" XXXXX "^(string_of_float (List.nth hs 5))));(find_net_damage_avg mon enemies) /. (List.nth hs 5)) in
   let props = [def_prop;pda_prop;spe_prop;res_prop;spv_prop;nda_prop] in
-  List.fold_left2 (fun acc x y -> x*.y +. acc) 0. props weights
+  List.fold_left2 (fun acc x y -> if mon.species = "Magikarp" then (print_endline (mon.species^" TTTTTTTT "^(string_of_float x)));x*.y +. acc) 0. props weights
   
 let total_proportions mons es ws =
   let high_net_damage = highest (find_net_damage_avgs mons es)
@@ -163,7 +166,8 @@ let total_proportions mons es ws =
   and high_def = highest (def_stats_list mons) in 
   let highs =
     [high_def;high_pure_damage;high_speed;high_res;high_spevs;high_net_damage] in
-  let helper acc x = (find_total_proportion x mons es ws highs,x)::acc in
+  let helper acc x = if x.species = "Magikarp" || x.species = "Zapdos" then (print_endline (x.species^" "^(string_of_float (find_total_proportion x mons es ws highs))));
+                     (find_total_proportion x mons es ws highs,x)::acc in
   List.fold_left helper [] mons
 
 let highest_total_proportion mons es ws =
@@ -182,7 +186,8 @@ let no_miss_damage attack mon1 mon2 =
   and power = float_of_int attack.power
   and (stab,mult) = (calc_stab attack mon1, calc_mult attack mon2)
   and (att,def) = (find_att_stat attack mon1, find_def_stat attack mon2) in
-  let damage = (power *. att *. stab *. mult /. def) /. hp in
+  let damage = if hp = 0. then 0.
+               else (power *. att *. stab *. mult /. def) /. hp in
   if attack.accuracy = 100 then
     if damage > 1. then 1. else damage
   else 0.
@@ -198,23 +203,43 @@ let can_one_shot mon1 mon2 =
   let (dmg,att) = List.hd (no_miss_damages_and_attacks mon1 mon2) in
   if dmg = 1. then (true,att) else (false,"")
 
+let best_matchup_rating mons enemies =
+  let f m e = find_damages_and_attacks m e in
+  let p m e = fst (List.hd (f m e)) -. fst (List.hd (f e m)) in
+  let sum m = List.fold_left (fun acc x -> (p m x) +. acc) 0. enemies in
+  let l = List.fold_left (fun acc x -> (sum x, x)::acc) [] mons in
+  let sl = List.sort cmp_tup_floats l in
+  let rec find_alive l =
+    match l with
+    | [] -> failwith "All of the steammon are fainted"
+    | (x,h)::t -> if h.curr_hp > 0 then (x,h) else find_alive t in
+  find_alive sl
+
+let find_switch_in mon mons enemy =
+  let ats m = find_damages_and_attacks m enemy
+  and des m = find_damages_and_attacks enemy m in
+  let p m = fst (List.hd (ats m)) -. fst (List.hd (des m)) in
+  let l = List.fold_left (fun acc x -> (p x, x)::acc) [] mons in
+  let sl = List.sort cmp_tup_floats l in
+  let rec find_alive_switch l =
+    match l with
+    | [] -> failwith "All of the steammon are fainted"
+    | (x,h)::t -> if h.curr_hp > 0 && h.species <> mon.species then (x,h) 
+                  else find_alive_switch t in
+  find_alive_switch sl
+
 
 let handle_request c r =
   match r with
-    | StarterRequest(gs)-> begin
+    | StarterRequest(gs)-> begin print_endline "11111111";
         let (a1,b1) = gs in
         let my_team = if c = Red then a1 else b1
         and their_team = if c = Red then b1 else a1 in
         let (mons,_) = my_team and (enemies,_) = their_team in
-        let mon = List.hd mons and enemy = List.hd enemies in
-        let ats m = find_damages_and_attacks m enemy
-        and des m = find_damages_and_attacks enemy m in
-        let p m = fst (List.hd (ats m)) /. fst (List.hd (des m)) in
-        let l = List.fold_left (fun acc x -> (p x, x)::acc) [] mons in
-        let sl = List.sort cmp_tup_floats l in
-        let (pr,best) = List.hd sl in
+        let (pr,best) = best_matchup_rating mons enemies in
+        print_endline ("Switch in hp: "^best.species^" "^(string_of_int best.curr_hp));
         SelectStarter(best.species) end
-    | PickRequest(color, gs, attack_list, mons_list) ->
+    | PickRequest(color, gs, attack_list, mons_list) -> begin print_endline "222222222";
         let (a1,b1) = gs in
         let their_team = if c = Red then b1 else a1 in
         let (enemies,_) = their_team in
@@ -224,30 +249,35 @@ let handle_request c r =
           let picks_left = float_of_int cNUM_PICKS -. num_enemies in
           let lst = [2.*.picks_left;2.*.picks_left;2.*.picks_left;picks_left;
                      num_enemies;4.*.num_enemies] in
-          let s = highest_total_proportion mons_list enemies lst in
+          let lst2 = [1.;1.;1.;1.;0.;0.] in
+          let s = highest_total_proportion mons_list enemies lst2 in
           print_endline ("picking "^s.species);
-          PickSteammon(s.species) end
-    | ActionRequest (gr) ->
+          PickSteammon(s.species) end end
+    | ActionRequest (gr) -> begin print_endline "33333333333";
         let (a1, b1) = gr in
         let my_team = if c = Red then a1 else b1 in
         let their_team = if c = Red then b1 else a1 in
         let (mons, my_inv) = my_team and (enemies, their_inv) = their_team in
+        print_endline "A";
         begin match mons with
         | h::t -> begin
+            print_endline "B";
             let mon = List.hd mons and enemy = List.hd enemies in
-            let ats m = find_damages_and_attacks m enemy
-            and des m = find_damages_and_attacks enemy m in
+            print_endline "C";
             let (one_shot,att) = can_one_shot mon enemy in
-            let p m = fst (List.hd (ats m)) /. fst (List.hd (des m)) in
-            let l = List.fold_left (fun acc x -> (p x, x)::acc) [] mons in
-            let sl = List.sort cmp_tup_floats l in
-            let (pr,best) = List.hd sl in
-            if one_shot && faster mon enemy then UseAttack(att)
-            else if (pr > ((p mon) *. 3. /. 2.)) && (best.curr_hp <> 0) then 
-              SwitchSteammon(best.species)
-            else UseAttack(snd (List.hd (ats mon))) end
-        | _ -> failwith "WHAT IN THE NAME OF ZARDOZ HAPPENED HERE" end
-    | PickInventoryRequest (gr) -> 
+            print_endline "D";
+            let (pr,best) = find_switch_in mon mons enemy in
+            print_endline "E";
+            let p m = fst (List.hd (find_damages_and_attacks m enemy)) -. 
+                      fst (List.hd (find_damages_and_attacks enemy m)) in
+            print_endline "F";
+            if one_shot && faster mon enemy then (print_endline "G";UseAttack(att))
+            else if (pr > ((p mon) *. 3. /. 2.)) then 
+              (print_endline ("Switch in hp: "^best.species^" "^(string_of_int best.curr_hp));
+              SwitchSteammon(best.species))
+            else (print_endline "H";UseAttack(snd (List.hd (find_damages_and_attacks mon enemy)))) end
+        | _ -> failwith "WHAT IN THE NAME OF ZARDOZ HAPPENED HERE" end end
+    | PickInventoryRequest (gr) -> begin print_endline "44444444444";
         let (a1, b1) = gr in
         let my_team = if c = Red then a1 else b1 in
         let their_team = if c = Red then b1 else a1 in
@@ -261,5 +291,5 @@ let handle_request c r =
         and xaccuracy = 0
         and xspeeds = 0 in
         PickInventory([ethers;maxpots;revives;fullheals;
-                       xattacks;xdefenses;xaccuracy;xspeeds])
+                       xattacks;xdefenses;xaccuracy;xspeeds]) end
 let () = run_bot handle_request

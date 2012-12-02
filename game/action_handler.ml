@@ -27,7 +27,7 @@ let find_msteammon (msteammon_list : msteammon list) (name : string) : msteammon
 (* Moves a steammon to the front of the team *)
 let switch_steammons (steammons : msteammon list ref) (name : string) : unit =
   let switch_in = find_msteammon !steammons name in
-  if switch_in.mcurr_hp = 0 then failwith "Cannot switch in a fainted steammon"
+  if switch_in.mcurr_hp = 0 then (print_endline (switch_in.mspecies^" UUUUUUU");failwith "Cannot switch in a fainted steammon")
   else begin
     let switch_out = List.hd !steammons in
     (switch_out.mmods).mattack_mod <- 0;
@@ -94,7 +94,7 @@ let use_item (steammons : msteammon list ref) (minventory : minventory)
   
   (* Applies MaxPotion to the target msteammon *)
   let apply_maxpotion () = 
-    if msteammon.mcurr_hp = 0 then failwith "Cannot use on a fainted steammon"
+    if msteammon.mcurr_hp = 0 then (print_endline (msteammon.mspecies^" OOOOOOO "^(string_of_int msteammon.mcurr_hp));failwith "Cannot use on a fainted steammon")
     else (let c = msteammon.mcurr_hp in
           msteammon.mcurr_hp <- msteammon.mmax_hp;
           add_update (UpdateSteammon (msteammon.mspecies,
@@ -158,6 +158,7 @@ let use_item (steammons : msteammon list ref) (minventory : minventory)
 let use_attack (steammons1 : msteammon list ref) (steammons2 : msteammon list ref)
       (att_name : string) (color : color) : unit =
   
+  let _ = Random.self_init () in  
   let opp's = (string_of_color (opposite_color color))^"'s " in
 
   (* Assigns the attacker as the first steammon in the first team
@@ -278,7 +279,7 @@ let use_attack (steammons1 : msteammon list ref) (steammons2 : msteammon list re
     
     (* Applies the attack's effect (if any) *)
     let (effect,p) = attack.meffect in
-    let chance f = if Random.int 100 < p then f else () in
+    let chance f = let x = Random.int 100 in if x < p then ((print_endline ((string_of_int p)^" "^(string_of_int x)));f ()) else () in
     let statusable = List.length defender.mstatus < 2 in
     let apply f = if statusable then chance f in
     let poison () = 
@@ -336,19 +337,19 @@ let use_attack (steammons1 : msteammon list ref) (steammons2 : msteammon list re
       if defender.mmods.maccuracy_mod > -3 then
         defender.mmods.maccuracy_mod <- defender.mmods.maccuracy_mod - 1 in
     begin match effect with
-    | Poisons -> apply (poison ())
-    | Confuses -> apply (confuse ())
-    | Sleeps -> apply (sleep ())
-    | Paralyzes -> apply (paralyze ())
-    | Freezes -> apply (freeze ())
-    | SelfAttackUp1 -> chance (self_att ())
-    | SelfDefenseUp1 -> chance (self_def ())
-    | SelfSpeedUp1 -> chance (self_spe ())
-    | SelfAccuracyUp1 -> chance (self_acc ())
-    | OpponentAttackDown1 -> chance (opp_att ())
-    | OpponentDefenseDown1 -> chance (opp_def ())
-    | OpponentSpeedDown1 -> chance (opp_spe ())
-    | OpponentAccuracyDown1 -> chance (opp_acc ())
+    | Poisons -> apply poison
+    | Confuses -> apply confuse
+    | Sleeps -> apply sleep
+    | Paralyzes -> apply paralyze
+    | Freezes -> apply freeze
+    | SelfAttackUp1 -> chance self_att
+    | SelfDefenseUp1 -> chance self_def
+    | SelfSpeedUp1 -> chance self_spe
+    | SelfAccuracyUp1 -> chance self_acc
+    | OpponentAttackDown1 -> chance opp_att
+    | OpponentDefenseDown1 -> chance opp_def
+    | OpponentSpeedDown1 -> chance opp_spe
+    | OpponentAccuracyDown1 -> chance opp_acc
     | _ -> () end;
     add_update (SetStatusEffects (defender.mspecies,defender.mstatus)) end
   
