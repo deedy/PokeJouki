@@ -169,7 +169,7 @@ let speeds_list mons =
 (*******************************************)
 
 let p f mon high =
-  if high = 0. then (print_endline "1";high) else (if mon.species = "Typhlosion" then (print_endline ("2: "^(string_of_float ((f mon) /.high))));(f mon) /. high)
+  if high = 0. then high else (f mon) /. high
 
 let p_list mons enemies (a,b,c,d,e,f) =
   let highs = [fst (highest (pure_damage_list mons));
@@ -218,16 +218,15 @@ let handle_request c r =
              let (mons, _) = my_team and (enemies, _) = their_team in
              let m = float_of_int (List.length enemies) in
              let n = (float_of_int cNUM_PICKS) -. m in
-             let pdw = 5.+.n
-             and rw = (2.+.n)/.3.
-             and dsw = 5.+.n
-             and sw = (3.+.n)/.2.
-             and svw = 9.+.m/.2.
-             and ndw = 21.+2.*.m in
+             let pdw = 3.+.2.*.n
+             and rw = 1.+.n
+             and dsw = 3.+.2.*.n
+             and sw = 2.+.n
+             and svw = 9.+.m
+             and ndw = 21.+.2.*.m in
              let weights = (pdw,rw,dsw,sw,svw,ndw) in
-             let lst = p_list mons_list enemies weights in
-             let (d,my_pick) = highest lst in
-             print_endline ("picking "^my_pick.species^": "^(string_of_float d));
+             let (_,my_pick) = highest (p_list mons_list enemies weights) in
+             print_endline ("picking "^my_pick.species);
              PickSteammon(my_pick.species) end
          | [] -> failwith "no steammon to pick!")
     | ActionRequest (gr) ->
